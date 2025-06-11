@@ -15,12 +15,14 @@ const AddLocalAgent: React.FC = () => {
 
   const [spawnAgentConfig, setSpawnAgentConfig] = useState({
     model: 'qwen3-30b-a3b', //'qwen3-30b-a3b',
-    apiBaseUrl: 'http://192.168.13.6:1234',
+    apiBaseUrl: 'http://host.docker.internal:1234',
     port: '',
     name: 'Software Engineer',
     description: 'An AI assistant specialized in software engineering tasks.',
     providerType: 'LMSTUDIO', // or LMSTUDIO
     environmentVariables: '{}', // Default empty JSON object string
+    executionMode: 'DOCKERIZED' as 'BARE_HOST' | 'DOCKERIZED', // Add execution mode
+    scopePath: '~', // Add scope path
   });
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isSpawning, setIsSpawning] = useState(false);
@@ -48,15 +50,29 @@ const AddLocalAgent: React.FC = () => {
 
     console.log('Attempting to spawn agent with config:', spawnAgentConfig);
 
-    let parsedEnvironmentVariables = {};
+    let parsedEnvironmentVariables: Record<string, string> = {}; // Use Record<string, string> for environment variables
     try {
-      parsedEnvironmentVariables = JSON.parse(spawnAgentConfig.environmentVariables);
+      // Ensure the parsed result is treated as Record<string, string>
+      const parsed = JSON.parse(spawnAgentConfig.environmentVariables);
+      if (typeof parsed === 'object' && parsed !== null) {
+        for (const key in parsed) {
+          if (Object.prototype.hasOwnProperty.call(parsed, key) && typeof parsed[key] === 'string') {
+            parsedEnvironmentVariables[key] = parsed[key];
+          }
+        }
+      }
     } catch (e) {
       setStatusMessage('Error: Invalid JSON for environment variables.');
       setMessageType('error');
       setIsSpawning(false);
       return; // Stop the spawn process if JSON is invalid
     }
+
+    if (spawnAgentConfig.executionMode === 'DOCKERIZED') {
+      // Assuming LM Studio is running on the host on port 56350 (based on user's comment)
+      parsedEnvironmentVariables.apiBaseUrl = 'http://host.docker.internal:1234/v1';
+    }
+
 
     const variables = {
       model: spawnAgentConfig.model,
@@ -66,6 +82,8 @@ const AddLocalAgent: React.FC = () => {
       description: spawnAgentConfig.description || null,
       providerType: spawnAgentConfig.providerType,
       environmentVariables: parsedEnvironmentVariables,
+      executionMode: spawnAgentConfig.executionMode, // Add executionMode
+      scopePath: spawnAgentConfig.scopePath || null, // Add scopePath, use null if empty
       // systemPrompt is no longer sent during spawn
     };
     console.log('Variables being sent for spawn:', variables);
@@ -73,8 +91,8 @@ const AddLocalAgent: React.FC = () => {
     try {
       const response = await axios.post('http://localhost:3000/graphql', {
         query: `
-          mutation SpawnKaAgent($model: String, $apiBaseUrl: String, $port: Int, $name: String, $description: String, $providerType: LlmProviderType, $environmentVariables: JSONObject) {
-            spawnKaAgent(model: $model, apiBaseUrl: $apiBaseUrl, port: $port, name: $name, description: $description, providerType: $providerType, environmentVariables: $environmentVariables) {
+          mutation SpawnKaAgent($model: String, $apiBaseUrl: String, $port: Int, $name: String, $description: String, $providerType: LlmProviderType, $environmentVariables: JSONObject, $executionMode: String!, $scopePath: String) {
+            spawnKaAgent(model: $model, apiBaseUrl: $apiBaseUrl, port: $port, name: $name, description: $description, providerType: $providerType, environmentVariables: $environmentVariables, executionMode: $executionMode, scopePath: $scopePath) {
               id
               url
               name
@@ -276,7 +294,52 @@ const AddLocalAgent: React.FC = () => {
               />
             </div>
 
-  
+            {/* Execution Mode */}
+            <div className={styles.formField}>
+              <label className={styles.formLabel}>Execution Mode</label>
+              <div className={styles.radioGroup}>
+                <label className={styles.radioLabel}>
+                  <input
+                    type="radio"
+                    name="executionMode"
+                    value="BARE_HOST"
+                    checked={spawnAgentConfig.executionMode === 'BARE_HOST'}
+                    onChange={() => setSpawnAgentConfig({ ...spawnAgentConfig, executionMode: 'BARE_HOST', scopePath: '' })}
+                    className={styles.radioInput}
+                  />
+                  Bare Host
+                </label>
+                <label className={styles.radioLabel}>
+                  <input
+                    type="radio"
+                    name="executionMode"
+                    value="DOCKERIZED"
+                    checked={spawnAgentConfig.executionMode === 'DOCKERIZED'}
+                    onChange={() => setSpawnAgentConfig({ ...spawnAgentConfig, executionMode: 'DOCKERIZED' })}
+                    className={styles.radioInput}
+                  />
+                  Safe (Dockerized)
+                </label>
+              </div>
+            </div>
+
+            {/* Scope Path (Conditionally rendered) */}
+            {spawnAgentConfig.executionMode === 'DOCKERIZED' && (
+              <div className={styles.formField}>
+                <label htmlFor="scopePath" className={styles.formLabel}>Scope Path (for Dockerized mode)</label>
+                <input
+                  type="text"
+                  id="scopePath"
+                  name="scopePath"
+                  placeholder="/path/to/agent/sandbox"
+                  value={spawnAgentConfig.scopePath}
+                  onChange={(e) => setSpawnAgentConfig({ ...spawnAgentConfig, scopePath: e.target.value })}
+                  className={styles.formInput}
+                />
+              </div>
+            )}
+
+            {/* LLM Provider */}
             <div className={styles.formField}>
               <label htmlFor="providerType" className={styles.formLabel}>LLM Provider</label>
               <select

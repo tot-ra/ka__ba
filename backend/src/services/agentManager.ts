@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { Agent, AgentRegistry } from './agentRegistry.js'; // Import Agent from agentRegistry
-import { LocalAgentManager } from './localAgentManager.js';
+import { LocalAgentManager } from './localAgentManager.js'; // Trigger re-evaluation
 import { AgentDiscoveryService } from './agentDiscoveryService.js';
 import { AgentTaskService } from './agentTaskService.js';
 import { AgentSubscriptionService } from './agentSubscriptionService.js';
@@ -77,7 +77,19 @@ export class AgentManager {
     return true;
   }
 
-  public async spawnLocalAgent(args: { model?: string, systemPrompt?: string, apiBaseUrl?: string, port?: number | null, name?: string, description?: string }): Promise<Agent | null> {
+  // Update the signature to match LocalAgentManager.spawnLocalAgent
+  public async spawnLocalAgent(args: {
+    model?: string;
+    systemPrompt?: string;
+    apiBaseUrl?: string;
+    port?: number | null;
+    name?: string;
+    description?: string;
+    providerType?: string; // Add providerType
+    environmentVariables?: { [key: string]: any }; // Add environmentVariables
+    executionMode: 'BARE_HOST' | 'DOCKERIZED'; // Add executionMode
+    scopePath?: string; // Add scopePath
+  }): Promise<Agent | null> {
     const newAgent = await this.localAgentManager.spawnLocalAgent(args);
     if (newAgent) {
         this.agentDiscoveryService.fetchAgentCapabilities(newAgent);

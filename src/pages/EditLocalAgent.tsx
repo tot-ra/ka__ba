@@ -21,7 +21,13 @@ interface AgentDetails {
   systemPrompt?: string; // Add systemPrompt field
   pid?: number; // Add pid for AgentList
   providerType?: 'LMSTUDIO' | 'GOOGLE'; // Add LLM provider type
-  environmentVariables?: { [key: string]: any }; // Add environment variables
+  environmentVariables?: Record<string, string>; // Update type to Record<string, string>
+  executionMode?: 'BARE_HOST' | 'DOCKERIZED'; // Add executionMode
+  apiBaseUrl?: string; // Add apiBaseUrl to AgentDetails
+}
+
+interface EditedAgentDetails extends Partial<AgentDetails> {
+  apiBaseUrl?: string; // Explicitly include apiBaseUrl in edited state
 }
 
 interface McpServerConfig {
@@ -44,7 +50,7 @@ const EditLocalAgent: React.FC = () => {
   const [isLoadingAgent, setIsLoadingAgent] = useState(true);
   const [errorLoadingAgent, setErrorLoadingAgent] = useState<string | null>(null);
 
-  const [editedAgentDetails, setEditedAgentDetails] = useState<Partial<AgentDetails>>({}); // State for edited fields
+  const [editedAgentDetails, setEditedAgentDetails] = useState<EditedAgentDetails>({}); // State for edited fields
 
   const [allAgents, setAllAgents] = useState<AgentDetails[]>([]); // State for all agents
   const [isLoadingAgents, setIsLoadingAgents] = useState(true); // Loading state for all agents
@@ -86,6 +92,7 @@ const EditLocalAgent: React.FC = () => {
             pid # Fetch pid
             providerType # Fetch providerType
             environmentVariables # Fetch environmentVariables
+            executionMode # Fetch executionMode
           }
         }
       `, { agentId });
@@ -103,6 +110,8 @@ const EditLocalAgent: React.FC = () => {
         systemPrompt: agent.systemPrompt,
         providerType: agent.providerType,
         environmentVariables: agent.environmentVariables,
+        executionMode: agent.executionMode, // Initialize executionMode
+        apiBaseUrl: agent.url, // Initialize apiBaseUrl from agent URL (approximation)
       });
       setComposedSystemPrompt(agent.systemPrompt || ''); // Initialize prompt with existing one
       // Note: We don't have info on *which* tools were used to compose the *current* prompt,
@@ -378,19 +387,38 @@ const EditLocalAgent: React.FC = () => {
 
     setIsUpdatingPrompt(true); // Reuse this state for any update
     try {
-      // Prepare updates object, ensuring environmentVariables is a parsed JSON object
-      let updatesToSend: any = { ...editedAgentDetails };
-      if (typeof updatesToSend.environmentVariables === 'string') {
+      // Prepare updates object
+      let updatesToSend: Partial<AgentDetails> = { ...editedAgentDetails };
+
+      // Ensure environmentVariables is a parsed JSON object (Record<string, string>)
+      let parsedEnvironmentVariables: Record<string, string> = {};
+      // Check if environmentVariables exists and is a string before attempting to parse
+      if (updatesToSend.environmentVariables && typeof updatesToSend.environmentVariables === 'string') {
          try {
-            updatesToSend.environmentVariables = JSON.parse(updatesToSend.environmentVariables);
+            const parsed = JSON.parse(updatesToSend.environmentVariables);
+             if (typeof parsed === 'object' && parsed !== null) {
+                for (const key in parsed) {
+                  if (Object.prototype.hasOwnProperty.call(parsed, key) && typeof parsed[key] === 'string') {
+                    parsedEnvironmentVariables[key] = parsed[key];
+                  }
+                }
+              }
          } catch (e) {
             console.error('Invalid JSON for environment variables:', e);
             // Handle invalid JSON error, maybe set a status message
             setIsUpdatingPrompt(false);
             return;
          }
+      } else if (updatesToSend.environmentVariables && typeof updatesToSend.environmentVariables === 'object') {
+         // If it's already an object, use it directly
+         parsedEnvironmentVariables = updatesToSend.environmentVariables;
       }
 
+      if (agentDetails?.executionMode === 'DOCKERIZED' && !parsedEnvironmentVariables.apiBaseUrl) {
+         parsedEnvironmentVariables.apiBaseUrl = 'http://host.docker.internal:1234/v1';
+      }
+
+      updatesToSend.environmentVariables = parsedEnvironmentVariables; // Assign the potentially updated object
 
       const UPDATE_AGENT_MUTATION = `
           mutation UpdateAgent($agentId: ID!, $updates: UpdateAgentInput!) {
@@ -581,6 +609,21 @@ const EditLocalAgent: React.FC = () => {
               </select>
             </div>
 
+             {/* API Base URL (Conditionally rendered) */}
+            {agentDetails.executionMode === 'BARE_HOST' && (
+              <div className={styles.formField}>
+                <label htmlFor="editApiBaseUrl" className={styles.formLabel}>API Base URL</label>
+                <input
+                  type="text"
+                  id="editApiBaseUrl"
+                  name="apiBaseUrl"
+                  value={editedAgentDetails.apiBaseUrl || ''}
+                  onChange={(e) => setEditedAgentDetails({ ...editedAgentDetails, apiBaseUrl: e.target.value })}
+                  className={styles.formInput}
+                />
+              </div>
+            )}
+
              {/* Environment Variables */}
             <div className={styles.formField}>
               <label htmlFor="editEnvironmentVariables" className={styles.formLabel}>Environment Variables (JSON)</label>
@@ -590,14 +633,8 @@ const EditLocalAgent: React.FC = () => {
                 placeholder='e.g., {"GEMINI_API_KEY": "YOUR_API_KEY"}'
                 value={typeof editedAgentDetails.environmentVariables === 'object' ? JSON.stringify(editedAgentDetails.environmentVariables, null, 2) : editedAgentDetails.environmentVariables || ''}
                 onChange={(e) => {
-                  try {
-                    // Attempt to parse the JSON string
-                    const parsedEnv = JSON.parse(e.target.value);
-                    setEditedAgentDetails({ ...editedAgentDetails, environmentVariables: parsedEnv });
-                  } catch (error) {
-                    // If parsing fails, store the raw string and handle the error on update
-                    setEditedAgentDetails({ ...editedAgentDetails, environmentVariables: e.target.value as any }); // Store as string for now, handle error on update
-                  }
+                  // Store as string for now, handle parsing on update
+                  setEditedAgentDetails({ ...editedAgentDetails, environmentVariables: e.target.value as any });
                 }}
                 rows={5}
                 className={styles.formTextarea}
