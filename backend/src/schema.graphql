@@ -13,6 +13,7 @@ type Agent {
   systemPrompt: String # Add systemPrompt field
   providerType: LlmProviderType # Add LLM provider type
   environmentVariables: JSONObject # Add environment variables
+  executionMode: String # Add executionMode field
 }
 
 # --- MCP Server Related Types ---
@@ -153,7 +154,19 @@ input UpdateAgentInput {
 type Mutation {
   addAgent(url: String!, name: String): Agent!
   removeAgent(id: ID!): Boolean!
-  spawnKaAgent(model: String, systemPrompt: String, apiBaseUrl: String, port: Int, name: String, description: String, providerType: LlmProviderType, environmentVariables: JSONObject): Agent!
+  
+  spawnKaAgent(
+    model: String, 
+    systemPrompt: String, 
+    apiBaseUrl: String, 
+    port: Int, 
+    name: String, 
+    description: String, 
+    providerType: LlmProviderType, 
+    environmentVariables: JSONObject, 
+    executionMode: String!, 
+    scopePath: String): Agent!
+
   stopKaAgent(id: ID!): Boolean!
   composeSystemPrompt(agentId: ID!, toolNames: [String!]!, mcpServerNames: [String!]!): String! # Mutation to compose system prompt
   createTask(

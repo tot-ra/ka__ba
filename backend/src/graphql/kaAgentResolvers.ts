@@ -27,6 +27,8 @@ interface UpdateAgentInput {
   systemPrompt?: string;
   providerType?: 'LMSTUDIO' | 'GOOGLE'; // Match the enum values
   environmentVariables?: JSONObject;
+  executionMode?: 'BARE_HOST' | 'DOCKERIZED'; // Add to UpdateAgentInput as well for potential future updates
+  scopePath?: string; // Add to UpdateAgentInput
 }
 
 export const kaAgentResolvers = {
@@ -57,9 +59,32 @@ export const kaAgentResolvers = {
           },
   },
   Mutation: {
-    spawnKaAgent: async (_parent: any, args: { model?: string, systemPrompt?: string, apiBaseUrl?: string, port?: number | null, name?: string, description?: string, providerType?: 'LMSTUDIO' | 'GOOGLE', environmentVariables?: JSONObject }, context: { agentManager: AgentManager }, _info: any): Promise<Agent> => { // Change return type to non-nullable Agent
+    spawnKaAgent: async (_parent: any, args: {
+      model?: string,
+      systemPrompt?: string,
+      apiBaseUrl?: string,
+      port?: number | null,
+      name?: string,
+      description?: string,
+      providerType?: 'LMSTUDIO' | 'GOOGLE',
+      environmentVariables?: JSONObject,
+      executionMode: 'BARE_HOST' | 'DOCKERIZED', // Add new argument
+      scopePath?: string // Add new argument
+    }, context: { agentManager: AgentManager }, _info: any): Promise<Agent> => { // Change return type to non-nullable Agent
       console.log('[GraphQL spawnKaAgent] Received args:', args);
-      const spawnedAgent = await context.agentManager.spawnLocalAgent(args);
+      // Pass the new arguments to spawnLocalAgent
+      const spawnedAgent = await context.agentManager.spawnLocalAgent({
+        model: args.model,
+        systemPrompt: args.systemPrompt,
+        apiBaseUrl: args.apiBaseUrl,
+        port: args.port,
+        name: args.name,
+        description: args.description,
+        providerType: args.providerType,
+        environmentVariables: args.environmentVariables,
+        executionMode: args.executionMode, // Pass new argument
+        scopePath: args.scopePath, // Pass new argument
+      });
 
       if (!spawnedAgent) {
         // If spawnLocalAgent returns null, throw a GraphQL error

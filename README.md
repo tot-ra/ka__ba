@@ -252,7 +252,7 @@ cat README.md | ./ka ai "Summarize this file."
 
 The `ka` agent (both server and CLI) uses environment variables for configuration, primarily for connecting to the LLM:
 
-*   `LLM_API_BASE`: (Required) The base URL of the OpenAI-compatible API (e.g., `http://localhost:1234/v1` for LM Studio).
+*   `apiBaseUrl`: (Required) The base URL of the OpenAI-compatible API (e.g., `http://localhost:1234/v1` for LM Studio).
 *   `LLM_API_KEY`: The API key for the LLM service (often optional for local models like LM Studio, e.g., `lm-studio`).
 *   `LLM_MODEL`: The model identifier to use (e.g., `local-model`). If not set, `ka` might use a default or the first available model.
 *   `KA_SERVER_PORT`: Port for the A2A HTTP server (defaults to `8080`).
@@ -261,7 +261,7 @@ The `ka` agent (both server and CLI) uses environment variables for configuratio
 
 Example `.env` file (place in `kaba/` and source it or use a tool like `direnv`):
 ```dotenv
-LLM_API_BASE="http://localhost:1234/v1"
+apiBaseUrl="http://localhost:1234/v1"
 LLM_API_KEY="lm-studio"
 LLM_MODEL="local-model"
 KA_SERVER_PORT="8081"

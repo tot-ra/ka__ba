@@ -18,7 +18,7 @@ import (
 
 const (
 	model                   = "" // Consider making this configurable via flags/env
-	apiURL                  = "http://localhost:1234/v1/chat/completions"
+	apiURL                  = "" //"http://localhost:1234/v1/chat/completions"
 	defaultMaxContextLength = 8192 // Increased default context length to accommodate long system prompt
 )
 
@@ -159,12 +159,12 @@ func runServerMode(flags FlagOptions, port int, availableToolsMap map[string]too
 	// Determine API URL based on provider and environment variable
 	currentAPIURL := apiURL // Default for LM Studio
 	if flags.providerFlag == "lmstudio" {
-		envAPIURL := os.Getenv("LLM_API_BASE")
+		envAPIURL := os.Getenv("apiBaseUrl")
 		if envAPIURL != "" {
 			currentAPIURL = envAPIURL
-			log.Printf("[runServerMode] Using LLM_API_BASE environment variable for LMStudio API URL: %s", currentAPIURL)
+			log.Printf("[runServerMode] Using apiBaseUrl environment variable for LMStudio API URL: %s", currentAPIURL)
 		} else {
-			log.Printf("[runServerMode] LLM_API_BASE environment variable not set, using default LMStudio API URL: %s", currentAPIURL)
+			log.Printf("[runServerMode] apiBaseUrl environment variable not set, using default LMStudio API URL: %s", currentAPIURL)
 		}
 	} else if flags.providerFlag == "google" {
 		// Google API key is handled within NewGoogleClient using GEMINI_API_KEY env var
@@ -194,7 +194,7 @@ func runServerMode(flags FlagOptions, port int, availableToolsMap map[string]too
 	// This includes the agent's identity, objective, communication style, and available tools.
 	// A separate endpoint exists to update the system prompt dynamically.
 	serverSystemMessage := composeCliSystemMessage(availableToolsMap) // Use the same composition logic as CLI mode
-	taskExecutor := a2a.NewTaskExecutor(llmClient, taskStore, availableToolsMap, serverSystemMessage)
+	taskExecutor := a2a.NewTaskExecutor(llmClient, taskStore, availableToolsMap, serverSystemMessage, flags.providerFlag)
 	fmt.Printf("[main] TaskExecutor initialized with %d available tools.\n", len(availableToolsMap))
 	log.Printf("[runServerMode] TaskExecutor initialized with system message:\n%s\n", serverSystemMessage) // Added logging
 
@@ -212,8 +212,7 @@ func runServerMode(flags FlagOptions, port int, availableToolsMap map[string]too
 		flags.jwtSecretFlag,
 		apiKeys,
 		availableToolsMap,
-		mcpToolInstance, // Pass mcpToolInstance
-		// Removed flags.providerFlag
+		mcpToolInstance,
 	)
 }
 
