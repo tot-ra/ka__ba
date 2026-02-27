@@ -1,3 +1,6 @@
+( closed in favor of https://github.com/a2gent/caesar )
+
+
 # 🙌🏻 ka_ba 🦚
 
 AI Agent Runtime (`ka`) and agent orchestration application (`ba`).
